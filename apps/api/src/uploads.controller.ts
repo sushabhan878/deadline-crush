@@ -153,12 +153,15 @@ export class VersionsController {
       if (v.status === 'expired') return { late: { now, deadline: new Date(h.deadline_at.getTime() + h.grace_seconds * 1000) } };
       if (v.status !== 'uploading') throw new AppError('VERSION_STATE_CONFLICT', `Version is ${v.status}`);
       if (v.completion_parts) return {};
-      if (!canComplete(now, h.deadline_at, h.grace_seconds)) {
-        await transition(tx, id, 'uploading', 'expired', { finalized_at: now });
+      const expire = async (at: Date) => {
+        await transition(tx, id, 'uploading', 'expired', { finalized_at: at });
         await audit(tx, c.hackathonId, c.teamId, u.id, 'version.expired', { versionId: id });
-        return { late: { now, deadline: new Date(h.deadline_at.getTime() + h.grace_seconds * 1000) }, cleanup: v };
-      }
+        return { late: { now: at, deadline: new Date(h.deadline_at.getTime() + h.grace_seconds * 1000) }, cleanup: v };
+      };
+      if (!canComplete(now, h.deadline_at, h.grace_seconds)) return expire(now);
       const listed = await storage.listParts(v.s3_key, v.s3_upload_id);
+      const validatedAt = await txNow(tx);
+      if (!canComplete(validatedAt, h.deadline_at, h.grace_seconds)) return expire(validatedAt);
       const sorted = [...parts].sort((a, b) => a.n - b.n);
       const valid = sorted.length === v.total_parts && listed.length === sorted.length &&
         sorted.every((p, i) => p.n === i + 1 && listed[i].n === p.n && listed[i].etag === p.etag);
@@ -167,11 +170,11 @@ export class VersionsController {
         throw new AppError('SIZE_MISMATCH', 'Uploaded size differs from declared size');
       }
       await tx.query(`UPDATE file_versions SET completion_requested_at=$2, links_snapshot=(SELECT current_links FROM submissions WHERE id=$3),
-        completion_parts=$4 WHERE id=$1`, [id, now, c.submissionId, JSON.stringify(sorted)]);
+        completion_parts=$4 WHERE id=$1`, [id, validatedAt, c.submissionId, JSON.stringify(sorted)]);
       return {};
     });
     if (ready.late) {
-      if (ready.cleanup) await storage.abort(ready.cleanup.s3_key, ready.cleanup.s3_upload_id);
+      if ('cleanup' in ready) await storage.abort(ready.cleanup.s3_key, ready.cleanup.s3_upload_id);
       await logLate(c.teamId, u.id, 'complete_upload', ready.late.now, ready.late.deadline, 'GRACE_EXPIRED', ip);
       throw new AppError('GRACE_EXPIRED', 'Upload window closed');
     }

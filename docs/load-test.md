@@ -32,6 +32,8 @@ The driver measures each API response through JSON decoding and records each end
 
 In the separate Linux integration run, the first worker received `SIGKILL` after reading the file type. The replacement finalized the same job on attempt 2. PostgreSQL held five check events, one acceptance event, and one matching hashed receipt. The same integration suite covered signed two-part uploads, ZIP README and PDF previews, cross-team access denial, grace, SSE replay, and CSV formula neutralization.
 
+The maximum-size integration run uploaded exactly 104,857,600 bytes in 13 signed PUTs and checked that only missing parts were listed after the first PUT. The worker read back the full object and produced the expected SHA-256. The fixture intentionally contained a malformed ZIP, which the worker flagged as `needs_fix`.
+
 ## Reproduce
 
 Start a fresh PostgreSQL database and private S3 bucket, then start the API and worker with those settings. In the driver shell, set `DATABASE_URL`, `JWT_SECRET` to the same value as the API, and `API` to the API root. Run `npm run loadtest`. `LOAD_TEAMS` and `LOAD_SECONDS` override the default 2,000 and 600. The run fails on a mismatch in team, version, receipt, job, or check counts, or when aggregate p95 is at least 300 ms. [Raw run output](../loadtest/verified-run.json)

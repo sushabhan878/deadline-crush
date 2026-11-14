@@ -11,11 +11,9 @@ export function isBlockedIp(ip: string): boolean {
       (a === 192 && b === 0) || (a === 198 && (b === 18 || b === 19)) || a >= 224;
   }
   if (net.isIPv6(ip)) {
-    const l = ip.toLowerCase();
-    if (l === '::1' || l === '::') return true;
-    const m = l.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/); // v4-mapped
-    if (m) return isBlockedIp(m[1]);
-    return /^f[cd]/.test(l) || /^fe[89ab]/.test(l) || l.startsWith('ff') || l.startsWith('2001:db8');
+    const l = new URL(`http://[${ip}]/`).hostname.slice(1, -1);
+    // Accept global unicast only. Exclude documentation, tunneling and other special-purpose ranges.
+    return !/^[23][0-9a-f]{3}:/.test(l) || /^2001:(?:[0-1]?[0-9a-f]{1,2}:|db8:)|^2002:|^3fff:/.test(l);
   }
   return true;
 }
@@ -46,7 +44,9 @@ export async function checkLink(raw: string, resolver: (h: string) => Promise<st
     let url = new URL(raw);
     for (let hop = 0; hop <= 3; hop++) {
       if (url.protocol !== 'https:') return { url: raw, ok: false, error: 'https only' };
-      const ips = net.isIP(url.hostname) ? [url.hostname] : await resolver(url.hostname);
+      if (url.username || url.password || url.port) return { url: raw, ok: false, error: 'Use a public HTTPS link on port 443 without credentials' };
+      const host = url.hostname.replace(/^\[|\]$/g, '');
+      const ips = net.isIP(host) ? [host] : await resolver(host);
       if (!ips.length || ips.some(isBlockedIp)) return { url: raw, ok: false, error: 'blocked address' };
       let r = await once(url, ips[0], 'HEAD');
       if (r.status >= 400 || r.status === 0) r = await once(url, ips[0], 'GET');

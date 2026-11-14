@@ -30,25 +30,33 @@ export function TeamPage({ me }: { me: Me }) {
   const [receipt, setReceipt] = useState<Version | null>(null);
   const [preview, setPreview] = useState<{ url: string; kind: string } | null | 'none'>(null);
   const lastStatus = useRef<string>();
+  const refreshId = useRef(0);
 
   const latest = versions?.[0];
   const counting = versions?.find((v) => v.currently_counts);
 
   const refresh = useCallback(async () => {
+    const id = ++refreshId.current;
     try {
       const vs: Version[] = await api(`/submissions/${sid}/versions`);
+      if (id !== refreshId.current) return;
       setVersions(vs);
       const l = vs[0];
-      if (l && l.status !== 'uploading' && l.status !== 'aborted') setChecks((await api(`/versions/${l.id}`)).checks ?? []);
-      else setChecks([]);
+      const results = l && l.completed_at ? (await api(`/versions/${l.id}`)).checks ?? [] : [];
+      if (id !== refreshId.current) return;
+      setChecks(results);
       if (l && lastStatus.current && lastStatus.current !== l.status) {
         const msg = `Version ${l.version_no} is now ${statusMeta(l.status).label}`;
         setLive(msg);
         if (l.status === 'accepted') toast('ok', msg); else if (l.status === 'needs_fix') toast('bad', msg);
       }
       lastStatus.current = l?.status;
-    } catch (e: any) { if (versions === null) setVersions([]); toast('bad', e.message); }
-  }, [sid, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+    } catch (e: any) {
+      if (id !== refreshId.current) return;
+      setVersions((prior) => prior ?? []);
+      if (e.code !== 'NETWORK' || navigator.onLine) toast('bad', e.message);
+    }
+  }, [sid, toast]);
 
   useEffect(() => { fetchInfo(team.hackathon_id).then(setInfo).catch(() => {}); void refresh(); }, [team.hackathon_id, refresh]);
   useEffect(() => subscribe(`/teams/${team.team_id}/events`, EVENTS, () => void refresh()), [team.team_id, refresh]);
@@ -112,7 +120,7 @@ export function TeamPage({ me }: { me: Me }) {
                   ))}
                 </div>}
                 <div className="row wrap" style={{ marginTop: 14 }}>
-                  {latest.status !== 'uploading' && latest.status !== 'aborted' && <button className="btn sm" onClick={() => setReceipt(latest)}><I.receipt /> Receipt</button>}
+                  {latest.completed_at && <button className="btn sm" onClick={() => setReceipt(latest)}><I.receipt /> Receipt</button>}
                   {['accepted', 'needs_fix', 'checking', 'uploaded'].includes(latest.status) && <button className="btn sm" onClick={() => download(latest)}><I.download /> Download</button>}
                 </div>
               </>}
@@ -141,7 +149,7 @@ export function TeamPage({ me }: { me: Me }) {
                       <td><StatusPill status={v.status} /></td>
                       <td>{shortDate(v.started_at)} {v.started_in_time ? <span className="pill ok">In time</span> : <span className="pill bad">Late</span>}</td>
                       <td className="mono muted">{v.sha256 ? `${v.sha256.slice(0, 10)}…` : '—'}</td>
-                      <td>{v.status !== 'uploading' && v.status !== 'aborted' && <button className="btn sm ghost" onClick={() => setReceipt(v)}>Receipt</button>}</td>
+                      <td>{v.completed_at && <button className="btn sm ghost" onClick={() => setReceipt(v)}>Receipt</button>}</td>
                     </tr>))}</tbody>
                 </table></div>
               )}

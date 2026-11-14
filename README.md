@@ -35,6 +35,6 @@ Services read environment variables. See [.env.example](.env.example) for defaul
 
 ## Verify
 
-`npm test` runs the 46 unit tests. `npm run test:integration` exercises a real API and deliberately kills a worker. Set `DATABASE_URL` and `S3_ENDPOINT` to dedicated test infrastructure, initialize the bucket with `npx tsx scripts/create-bucket.ts`, and migrate before running it. Use `TEST_LARGE=1` to exercise the exact 100 MiB limit across 13 direct PUTs. GitHub Actions runs the build, type checks, unit suite and integration suite on push and PR.
+`npm test` runs the 50 unit tests. `npm run test:integration` exercises a real API and deliberately kills a worker. Set `DATABASE_URL` and `S3_ENDPOINT` to dedicated test infrastructure, initialize the bucket with `npx tsx scripts/create-bucket.ts`, and migrate before running it. Use `TEST_LARGE=1` to exercise the exact 100 MiB limit across 13 direct PUTs. GitHub Actions runs the build, type checks, unit suite and integration suite on push and PR.
 
 To repeat the benchmark, follow the [load-test report](docs/load-test.md). In production, keep the object bucket private and configure its browser CORS policy for your app origin.
