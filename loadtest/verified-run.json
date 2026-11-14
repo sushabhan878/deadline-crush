@@ -1,0 +1,54 @@
+{
+  "run": "74fdc9ef-82df-4a1d-a2fe-d55fe4935e8e",
+  "startedAt": "2026-11-14T16:36:38.090Z",
+  "seconds": 600,
+  "teams": 2000,
+  "submitted": 2000,
+  "expectedVersions": 2040,
+  "successfulVersions": 2040,
+  "fixtureBytes": 235,
+  "errors": [],
+  "api": {
+    "count": 14463,
+    "p95Ms": 26.7
+  },
+  "endpoints": {
+    "time": {
+      "count": 2000,
+      "p95Ms": 5
+    },
+    "metadata": {
+      "count": 2000,
+      "p95Ms": 18.9
+    },
+    "start": {
+      "count": 2160,
+      "p95Ms": 22.9
+    },
+    "sign": {
+      "count": 2040,
+      "p95Ms": 9.7
+    },
+    "list": {
+      "count": 2103,
+      "p95Ms": 14.2
+    },
+    "complete": {
+      "count": 2160,
+      "p95Ms": 31.4
+    },
+    "versions": {
+      "count": 2000,
+      "p95Ms": 6.3
+    }
+  },
+  "reconciliation": {
+    "teams": 2000,
+    "versions": 2040,
+    "accepted": 2040,
+    "needs_fix": 0,
+    "receipts": 2040,
+    "jobs": 2040,
+    "checks": 10200
+  }
+}

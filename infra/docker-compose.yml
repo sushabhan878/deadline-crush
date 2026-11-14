@@ -1,0 +1,12 @@
+services:
+  postgres:
+    image: postgres:16
+    environment: { POSTGRES_USER: dc, POSTGRES_PASSWORD: dc, POSTGRES_DB: dc }
+    ports: ["5433:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+  storage:
+    image: chrislusf/seaweedfs:4.53
+    command: server -s3 -dir=/data -s3.config=/config/s3.json
+    ports: ["127.0.0.1:9000:8333"]
+    volumes: ["storagedata:/data", "./s3-dev.json:/config/s3.json:ro"]
+volumes: { pgdata: {}, storagedata: {} }

@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: deadline-crush
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: deadline-crush-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        value: auto
+      - key: TRUST_PROXY
+        value: 1
+      - key: EVENT_NAME
+        value: Hack4Hack Submission Challenge
+      - key: EVENT_JOIN_CODE
+        sync: false
+      - key: EVENT_DEADLINE
+        sync: false
+      - key: ORGANIZER_EMAIL
+        sync: false
+      - key: ORGANIZER_PASSWORD
+        sync: false
+databases:
+  - name: deadline-crush-db
+    plan: free

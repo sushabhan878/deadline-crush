@@ -1,0 +1,34 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://dc:dc@localhost:5432/dc
+      S3_ENDPOINT: http://localhost:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: dc, POSTGRES_PASSWORD: dc, POSTGRES_DB: dc }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U dc"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run typecheck -w apps/web
+      - run: npm run build -w apps/web
+      - run: npm run migrate
+      - run: npm test
+      - run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      - name: Start private S3-compatible storage
+        run: |
+          docker run -d --name qa-s3 -p 9000:8333 chrislusf/seaweedfs:4.53 server -s3 -dir=/data
+          node --import tsx scripts/create-bucket.ts
+      - run: npm run test:integration
