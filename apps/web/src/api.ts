@@ -1,8 +1,9 @@
 import { mockApi, mockFetchRaw } from './mock';
 
 /** Demo mode runs the whole UI against in-browser fake data (no Postgres/S3 needed). Enable with ?demo=1. */
+export const browserDemo = import.meta.env.VITE_BROWSER_DEMO === '1';
 if (new URLSearchParams(location.search).has('demo')) localStorage.setItem('dc_demo', '1');
-export const isDemo = () => localStorage.getItem('dc_demo') === '1';
+export const isDemo = () => browserDemo || localStorage.getItem('dc_demo') === '1';
 export const exitDemo = () => { localStorage.removeItem('dc_demo'); setToken(null); location.href = location.pathname; };
 
 let token: string | null = localStorage.getItem('dc_token');

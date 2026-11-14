@@ -1,7 +1,7 @@
 import './styles.css';
 import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { api, exitDemo, getToken, isDemo, setToken } from './api';
+import { api, browserDemo, exitDemo, getToken, isDemo, setToken } from './api';
 import { resetDemo } from './mock';
 import { HackathonPage } from './HackathonPage';
 import { TeamPage } from './TeamPage';
@@ -117,9 +117,9 @@ function App() {
     <>
       {isDemo() && (
         <div className="banner demo" role="note">
-          <b>Demo mode</b><span>— running against in-browser sample data, no server needed.</span><span className="spacer" />
+          <b>Browser demo</b><span>Sample data and simulated uploads.</span><span className="spacer" />
           <button className="btn sm ghost" onClick={() => { resetDemo(); location.reload(); }}>Reset data</button>
-          <button className="btn sm ghost" onClick={exitDemo}>Exit demo</button>
+          {!browserDemo && <button className="btn sm ghost" onClick={exitDemo}>Exit demo</button>}
         </div>
       )}
       <TopNav items={items} route={route === '/login' ? '' : route} user={me?.user} onLogout={logout}
