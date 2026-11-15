@@ -8,7 +8,7 @@ Hack4Hack PS2 project submissions with resumable direct-to-storage uploads, a se
 | Load test and worker crash evidence | [Report](docs/load-test.md) · [Raw results](loadtest/verified-run.json) |
 | Walkthrough | [MP4](docs/walkthrough.mp4) |
 | Hosted UI preview | [Browser demo with simulated uploads](https://sushabhan878.github.io/deadline-crush/) |
-| Deployment | [Render Blueprint](render.yaml) · [Setup](docs/deploy.md) |
+| Deployment | [Cloudflare R2 setup and verification](docs/deploy.md) · [Render Blueprint](render.yaml) |
 
 The 10-minute local test reconciled all **2,000 teams** and **2,040 accepted versions** at **26.7 ms API p95**. The test used 235-byte ZIP fixtures. Integration testing exercised the worker kill, real multipart upload, PDF and ZIP previews, grace, membership, SSE replay, and CSV export.
 

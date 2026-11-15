@@ -73,12 +73,13 @@ export class StartController {
       const id = randomUUID();
       const s3Key = `h/${c.hackathonId}/t/${c.teamId}/v/${id}`;
       // S3 call first inside tx: failure rolls back, no orphan DB row (PRD F-05 AC).
-      const uploadId = await storage.createMultipart(s3Key, b.contentType);
+      const filename = safeName(b.filename);
+      const uploadId = await storage.createMultipart(s3Key, filename);
       const n = (await tx.query('SELECT coalesce(max(version_no),0)+1 n FROM file_versions WHERE submission_id=$1', [c.submissionId])).rows[0].n;
       const ins = await tx.query(
         `INSERT INTO file_versions (id,submission_id,version_no,idempotency_key,status,s3_key,s3_upload_id,part_size,total_parts,declared_size,declared_filename,started_at)
          VALUES ($1,$2,$3,$4,'uploading',$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-        [id, c.submissionId, n, key, s3Key, uploadId, PART_SIZE, totalParts(b.size), b.size, safeName(b.filename), now]);
+        [id, c.submissionId, n, key, s3Key, uploadId, PART_SIZE, totalParts(b.size), b.size, filename, now]);
       await audit(tx, c.hackathonId, c.teamId, u.id, 'version.started', { versionId: id, versionNo: n, size: b.size });
       return { ok: storedResponse(ins.rows[0]), old: old.rows, expiresAt: new Date(h.deadline_at.getTime() + h.grace_seconds * 1000) };
     });

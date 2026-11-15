@@ -20,7 +20,7 @@ services:
       - key: S3_BUCKET
         sync: false
       - key: S3_REGION
-        sync: false
+        value: auto
       - key: TRUST_PROXY
         value: 1
       - key: EVENT_NAME

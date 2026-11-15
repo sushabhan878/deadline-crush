@@ -14,14 +14,17 @@ export const s3 = mk(config.s3.endpoint);
 /** Signing uses the browser-reachable endpoint. */
 const signer = mk(config.s3.publicEndpoint);
 const Bucket = config.s3.bucket;
+const attachment = (filename: string) => `attachment; filename="${filename.replace(/["\\\r\n]/g, '_')}"`;
 
 export const storage = {
   /** Health probe for /status (F-15). */
   async ping() {
     try { await s3.send(new HeadBucketCommand({ Bucket })); return true; } catch { return false; }
   },
-  async createMultipart(Key: string, ContentType?: string) {
-    const r = await s3.send(new CreateMultipartUploadCommand({ Bucket, Key, ContentType }));
+  async createMultipart(Key: string, filename: string) {
+    const r = await s3.send(new CreateMultipartUploadCommand({
+      Bucket, Key, ContentType: 'application/octet-stream', ContentDisposition: attachment(filename),
+    }));
     return r.UploadId!;
   },
   signPart: (Key: string, UploadId: string, PartNumber: number, ContentLength: number, expiresIn: number) =>
@@ -64,7 +67,7 @@ export const storage = {
   del: (Key: string) => s3.send(new DeleteObjectCommand({ Bucket, Key })).catch(() => {}),
   downloadUrl: (Key: string, filename: string, expiresIn = 60) =>
     getSignedUrl(signer, new GetObjectCommand({
-      Bucket, Key, ResponseContentDisposition: `attachment; filename="${filename.replace(/["\r\n]/g, '_')}"`,
+      Bucket, Key, ResponseContentDisposition: attachment(filename),
     }), { expiresIn }),
   previewUrl: (Key: string, expiresIn = 60) =>
     getSignedUrl(signer, new GetObjectCommand({ Bucket, Key }), { expiresIn }),

@@ -9,6 +9,14 @@ import jwt from 'jsonwebtoken';
 import { config, PART_SIZE, pool, storage } from '@dc/shared';
 
 assert(process.env.DATABASE_URL && process.env.S3_ENDPOINT, 'Use a migrated test database and test bucket');
+const verifyR2 = process.env.TEST_R2 === '1';
+if (verifyR2) {
+  const endpoint = new URL(config.s3.endpoint);
+  assert(endpoint.protocol === 'https:' && /^[a-f0-9]{32}(?:\.(?:eu|fedramp))?\.r2\.cloudflarestorage\.com$/.test(endpoint.hostname), 'Use the HTTPS S3 endpoint from your R2 bucket');
+  assert.equal(new URL(config.s3.publicEndpoint).origin, endpoint.origin, 'Use the R2 S3 endpoint for browser signatures');
+  assert.equal(config.s3.region, 'auto', 'Use S3_REGION=auto for R2');
+  assert(process.env.S3_BUCKET && process.env.S3_ACCESS_KEY && process.env.S3_SECRET_KEY, 'Provide test bucket credentials');
+}
 const root = process.env.API ?? 'http://127.0.0.1:3122';
 const processes: ReturnType<typeof spawn>[] = [];
 const spawnApp = (kind: 'api' | 'worker', extra = {}) => {
@@ -78,9 +86,26 @@ try {
   const put = async (v: { versionId: string }, bytes: Buffer, n = 1) => {
     const { urls: [part], expiresInSeconds } = await json(`/versions/${v.versionId}/parts/sign`, token, { partNumbers: [n] });
     assert(expiresInSeconds > 0 && expiresInSeconds <= 900);
-    const r = await fetch(part.url, { method: 'PUT', body: new Uint8Array(bytes), signal: AbortSignal.timeout(30_000) });
-    assert(r.ok, `PUT ${r.status} ${await r.text()}`);
-    return r.headers.get('ETag')!;
+    const headers: Record<string, string> = {};
+    if (verifyR2) {
+      headers.Origin = config.webOrigin;
+      headers['Content-Type'] = 'application/octet-stream';
+      const preflight = await fetch(part.url, { method: 'OPTIONS', headers: {
+        Origin: config.webOrigin, 'Access-Control-Request-Method': 'PUT', 'Access-Control-Request-Headers': 'content-type',
+      }, signal: AbortSignal.timeout(15_000) });
+      assert(preflight.ok, `R2 CORS preflight returned ${preflight.status}`);
+      assert.equal(preflight.headers.get('access-control-allow-origin'), config.webOrigin, 'Allow the exact WEB_ORIGIN in R2 CORS');
+      assert.match(preflight.headers.get('access-control-allow-methods') ?? '', /\bPUT\b/i);
+    }
+    const r = await fetch(part.url, { method: 'PUT', headers, body: new Uint8Array(bytes), signal: AbortSignal.timeout(60_000) });
+    assert(r.ok, `Signed part PUT returned ${r.status}`);
+    if (verifyR2) {
+      assert.equal(r.headers.get('access-control-allow-origin'), config.webOrigin);
+      assert.match(r.headers.get('access-control-expose-headers') ?? '', /\betag\b/i);
+    }
+    const etag = r.headers.get('ETag');
+    assert(etag, 'Storage did not return an ETag');
+    return etag;
   };
   const complete = (v: { versionId: string }, parts: { n: number; etag: string }[]) => json(`/versions/${v.versionId}/complete`, token, { parts });
   const key = randomUUID();
@@ -129,7 +154,24 @@ try {
   assert.equal(preview.kind, 'text');
   assert.match(await (await fetch(preview.url)).text(), /test|hello|demo|project/i);
   const own = await json(`/versions/${v.versionId}/download`, token);
-  assert.equal(createHash('sha256').update(Buffer.from(await (await fetch(own.url)).arrayBuffer())).digest('hex'), sha);
+  const download = await fetch(own.url);
+  assert(download.ok);
+  assert.match(download.headers.get('content-disposition') ?? '', /^attachment;.*project\.zip/);
+  assert.equal(download.headers.get('content-type'), 'application/octet-stream');
+  assert.equal(createHash('sha256').update(Buffer.from(await download.arrayBuffer())).digest('hex'), sha);
+  if (verifyR2) {
+    const direct = new URL(own.url);
+    direct.search = '';
+    const unsigned = await fetch(direct, { signal: AbortSignal.timeout(15_000) });
+    assert(unsigned.status >= 400 && unsigned.status < 500, `Unsigned object access returned ${unsigned.status}`);
+    const { rows: [{ s3_key }] } = await pool.query('SELECT s3_key FROM file_versions WHERE id=$1', [v.versionId]);
+    const temporary = await storage.downloadUrl(s3_key, 'project.zip', 1);
+    await delay(2500);
+    const expired = await fetch(temporary, { signal: AbortSignal.timeout(15_000) });
+    assert.equal(expired.status, 403, 'R2 must reject an expired presigned URL');
+    assert.match(await expired.text(), /<Code>ExpiredRequest<\/Code>/);
+    console.log('R2 verified: multipart CORS and exposed ETag, signed attachment download, unsigned access denied, expired URL denied.');
+  }
 
   const bad = await start({ ...file, size: 8 });
   await complete(bad, [{ n: 1, etag: await put(bad, Buffer.from('notazip!')) }]);
